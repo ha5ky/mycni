@@ -78,15 +78,30 @@ func bridgeByName(name string) (*netlink.Bridge, error) {
 	return br, nil
 }
 
-func setupVeth(netNS ns.NetNS, br *netlink.Bridge, ifName string, IPAddr string) error {
+func setupVeth(netNS ns.NetNS, br *netlink.Bridge, ifName string, hwAddr string, ipAddr string) error {
 	hostIface := &current.Interface{}
 
 	err := netNS.Do(func(hostNS ns.NetNS) error {
-		ip.SetupVeth(ifName,1500,)
+		hostVeth, containerVeth, err := ip.SetupVeth(ifName, 1500, hwAddr, hostNS)
+		if err != nil {
+			return err
+		}
+		hostIface.Name = hostVeth.Name
+		return nil
 	})
 	if err != nil {
 		return err
 	}
+	hIf, err := netlink.LinkByName(hostIface.Name)
+	if err != nil {
+		return err
+	}
+
+	err = netlink.LinkSetMaster(hIf, br)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func main() {
