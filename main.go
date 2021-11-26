@@ -20,6 +20,8 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/utils/buildversion"
 	"github.com/vishvananda/netlink"
+	netns2 "github.com/vishvananda/netns"
+	"net"
 	"syscall"
 )
 
@@ -87,6 +89,19 @@ func setupVeth(netNS ns.NetNS, br *netlink.Bridge, ifName string, hwAddr string,
 			return err
 		}
 		hostIface.Name = hostVeth.Name
+		// check if container veth running
+		cVethLink, err := netlink.LinkByName(containerVeth.Name)
+		if err != nil {
+			return err
+		}
+		_, vipNet, err := net.ParseCIDR(ipAddr)
+		if err != nil {
+			return err
+		}
+		err = netlink.AddrAdd(cVethLink, &netlink.Addr{IPNet: vipNet})
+		if err != nil {
+			return err
+		}
 		return nil
 	})
 	if err != nil {
@@ -109,6 +124,20 @@ func main() {
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
+	// get net config
+	netConf, err := loadConf(args.StdinData)
+	if err != nil {
+		return err
+	}
+
+	// setup bridge
+	br, err := setupBridge(netConf)
+	if err != nil {
+		return err
+	}
+
+	// setup veth
+	netns,err:=ns.GetNS()
 
 }
 
