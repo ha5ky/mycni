@@ -20,14 +20,18 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/utils/buildversion"
 	"github.com/vishvananda/netlink"
-	netns2 "github.com/vishvananda/netns"
 	"net"
+	"runtime"
 	"syscall"
 )
 
 type NetConf struct {
 	Bridge string `json:"bridge"`
 	IP     string `json:"ip"`
+}
+
+func init() {
+	runtime.LockOSThread()
 }
 
 func loadConf(conf []byte) (*NetConf, error) {
@@ -137,8 +141,20 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	// setup veth
-	netns,err:=ns.GetNS()
+	netns, err := ns.GetNS(args.Netns)
+	if err != nil {
+		return err
+	}
 
+	defer netns.Close()
+
+	err = setupVeth(netns, br, args.IfName, "", netConf.IP)
+	if err != nil {
+		return err
+	}
+
+	result := current.Result{}
+	return result.Print()
 }
 
 func cmdCheck(args *skel.CmdArgs) error {
